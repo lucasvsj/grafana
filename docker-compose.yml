@@ -164,7 +164,7 @@ services:
       - ./grafana/dashboards:/var/lib/grafana/dashboards
     
     networks:
-      - traefik-public
+      - traefik_network
       - grafana-prod-network
     
     labels:
@@ -239,7 +239,7 @@ services:
       - ./prometheus/alerts:/etc/prometheus/alerts
     
     networks:
-      - traefik-public
+      - traefik_network
       - grafana-prod-network
     
     labels:
@@ -303,5 +303,5 @@ networks:
   grafana-prod-network:
     driver: bridge
   
-  traefik-public:
+  traefik_network:
     external: true
