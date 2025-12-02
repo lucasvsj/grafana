@@ -1,0 +1,8 @@
+# Este directorio contiene los dashboards personalizados en formato JSON
+# Los dashboards se cargarán automáticamente en Grafana
+
+# Para añadir un dashboard:
+# 1. Crear el dashboard en la interfaz de Grafana
+# 2. Exportar como JSON (Share > Export > Save to file)
+# 3. Copiar el archivo JSON a este directorio
+# 4. Reiniciar Grafana o esperar la recarga automática

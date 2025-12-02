@@ -1,0 +1,61 @@
+# Configuración de Prometheus
+# Documentación: https://prometheus.io/docs/prometheus/latest/configuration/configuration/
+
+global:
+  scrape_interval: 15s # Por defecto, scrapear targets cada 15 segundos
+  evaluation_interval: 15s # Evaluar reglas cada 15 segundos
+  
+  # Adjuntar estas etiquetas a cualquier serie temporal o alerta
+  external_labels:
+    monitor: 'grafana-project'
+    environment: 'development'
+
+# Configuración de Alertmanager (opcional)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets:
+#           - alertmanager:9093
+
+# Cargar reglas de alerta
+# rule_files:
+#   - "/etc/prometheus/alerts/*.yml"
+
+# Configuración de scrape
+scrape_configs:
+  # Monitoreo de Prometheus mismo
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+  
+  # Monitoreo de Grafana
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['grafana-dev:3000']
+        labels:
+          service: 'grafana'
+          environment: 'development'
+  
+  # Monitoreo de Traefik (Reverse Proxy)
+  - job_name: 'traefik'
+    static_configs:
+      - targets: ['traefik:8080']
+        labels:
+          service: 'traefik'
+          environment: 'development'
+  
+  # Ejemplo: Node Exporter (descomentar si lo instalas)
+  # - job_name: 'node-exporter'
+  #   static_configs:
+  #     - targets: ['node-exporter:9100']
+  #       labels:
+  #         service: 'node-exporter'
+  
+  # Ejemplo: cAdvisor para métricas de contenedores Docker
+  # - job_name: 'cadvisor'
+  #   static_configs:
+  #     - targets: ['cadvisor:8080']
+  #       labels:
+  #         service: 'cadvisor'

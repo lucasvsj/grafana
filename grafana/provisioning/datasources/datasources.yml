@@ -1,0 +1,38 @@
+apiVersion: 1
+
+# Lista de datasources que se provisionarán automáticamente
+# Más info: https://grafana.com/docs/grafana/latest/administration/provisioning/#data-sources
+
+datasources:
+  # Prometheus - Datasource principal
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus-dev:9090
+    isDefault: true
+    editable: true
+    jsonData:
+  #     timeInterval: 30s
+  
+  # Ejemplo: Loki para logs (descomentar y configurar si tienes Loki)
+  # - name: Loki
+  #   type: loki
+  #   access: proxy
+  #   url: http://loki:3100
+  #   editable: true
+  
+  # Ejemplo: MySQL/PostgreSQL (descomentar y configurar según necesites)
+  # - name: MySQL
+  #   type: mysql
+  #   url: mysql-server:3306
+  #   database: mydb
+  #   user: grafana
+  #   secureJsonData:
+  #     password: 'password'
+  
+  # TestData (datasource de ejemplo para testing)
+  - name: TestData
+    type: testdata
+    access: proxy
+    isDefault: false
+    editable: false

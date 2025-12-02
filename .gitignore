@@ -1,0 +1,24 @@
+# Environment variables (contiene credenciales sensibles)
+.env
+
+# Datos de Grafana (volúmenes locales si existen)
+grafana-data/
+
+# Logs
+*.log
+
+# Backups
+backups/
+*.tar.gz
+*.sql
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

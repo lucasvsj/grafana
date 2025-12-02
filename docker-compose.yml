@@ -1,0 +1,307 @@
+version: '3.8'
+
+services:
+  # ==============================================
+  # GRAFANA - DESARROLLO
+  # ==============================================
+  grafana-dev:
+    image: grafana/grafana:latest
+    container_name: grafana-dev
+    restart: unless-stopped
+    
+    environment:
+      # Configuración básica
+      - GF_SERVER_ROOT_URL=http://localhost:3948
+      - GF_SERVER_DOMAIN=localhost
+      - GF_SERVER_HTTP_PORT=3000
+      
+      # Credenciales de admin
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_SECURITY_SECRET_KEY=${GRAFANA_SECRET_KEY}
+      
+      # Autenticación
+      - GF_AUTH_DISABLE_LOGIN_FORM=false
+      - GF_AUTH_DISABLE_SIGNOUT_MENU=false
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_USERS_ALLOW_ORG_CREATE=false
+      - GF_USERS_AUTO_ASSIGN_ORG=true
+      - GF_USERS_AUTO_ASSIGN_ORG_ROLE=Viewer
+      
+      # Anonimous access (disabled for security)
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      
+      # API configuration (for future Django integration)
+      - GF_SECURITY_ADMIN_API_KEY_ONLY=false
+      - GF_USERS_DEFAULT_THEME=dark
+      
+      # Security
+      - GF_SECURITY_COOKIE_SECURE=false
+      - GF_SECURITY_COOKIE_SAMESITE=lax
+      - GF_SECURITY_STRICT_TRANSPORT_SECURITY=false
+      
+      # Logs
+      - GF_LOG_MODE=console
+      - GF_LOG_LEVEL=debug
+      
+      # SMTP (optional)
+      - GF_SMTP_ENABLED=${SMTP_ENABLED:-false}
+      - GF_SMTP_HOST=${SMTP_HOST:-}
+      - GF_SMTP_USER=${SMTP_USER:-}
+      - GF_SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - GF_SMTP_FROM_ADDRESS=${SMTP_FROM_ADDRESS:-grafana@localhost}
+    
+    volumes:
+      - grafana-dev-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    
+    ports:
+      - "3948:3000"
+    
+    networks:
+      - grafana-dev-network
+    
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ==============================================
+  # PROMETHEUS - DESARROLLO
+  # ==============================================
+  prometheus-dev:
+    image: prom/prometheus:latest
+    container_name: prometheus-dev
+    restart: unless-stopped
+    
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    
+    volumes:
+      - prometheus-dev-data:/prometheus
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/alerts:/etc/prometheus/alerts
+    
+    ports:
+      - "9393:9090"
+    
+    networks:
+      - grafana-dev-network
+    
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ==============================================
+  # GRAFANA - PRODUCCIÓN
+  # ==============================================
+  grafana-prod:
+    image: grafana/grafana:latest
+    container_name: grafana-prod
+    restart: unless-stopped
+    
+    environment:
+      # Configuración básica
+      - GF_SERVER_ROOT_URL=https://grafana.lucasvsj.com
+      - GF_SERVER_DOMAIN=grafana.lucasvsj.com
+      - GF_SERVER_HTTP_PORT=3000
+      
+      # Credenciales de admin
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_SECURITY_SECRET_KEY=${GRAFANA_SECRET_KEY}
+      
+      # Autenticación
+      - GF_AUTH_DISABLE_LOGIN_FORM=false
+      - GF_AUTH_DISABLE_SIGNOUT_MENU=false
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_USERS_ALLOW_ORG_CREATE=false
+      - GF_USERS_AUTO_ASSIGN_ORG=true
+      - GF_USERS_AUTO_ASSIGN_ORG_ROLE=Viewer
+      
+      # Anonimous access (disabled for security)
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      
+      # API configuration (for future Django integration)
+      - GF_SECURITY_ADMIN_API_KEY_ONLY=false
+      - GF_USERS_DEFAULT_THEME=dark
+      
+      # Security (production settings)
+      - GF_SECURITY_COOKIE_SECURE=true
+      - GF_SECURITY_COOKIE_SAMESITE=lax
+      - GF_SECURITY_STRICT_TRANSPORT_SECURITY=true
+      - GF_SECURITY_STRICT_TRANSPORT_SECURITY_MAX_AGE_SECONDS=63072000
+      - GF_SECURITY_STRICT_TRANSPORT_SECURITY_PRELOAD=true
+      - GF_SECURITY_STRICT_TRANSPORT_SECURITY_SUBDOMAINS=true
+      - GF_SECURITY_X_CONTENT_TYPE_OPTIONS=true
+      - GF_SECURITY_X_XSS_PROTECTION=true
+      
+      # Logs
+      - GF_LOG_MODE=console
+      - GF_LOG_LEVEL=info
+      
+      # SMTP (optional)
+      - GF_SMTP_ENABLED=${SMTP_ENABLED:-false}
+      - GF_SMTP_HOST=${SMTP_HOST:-}
+      - GF_SMTP_USER=${SMTP_USER:-}
+      - GF_SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - GF_SMTP_FROM_ADDRESS=${SMTP_FROM_ADDRESS:-grafana@lucasvsj.com}
+    
+    volumes:
+      - grafana-prod-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    
+    networks:
+      - traefik-public
+      - grafana-prod-network
+    
+    labels:
+      # Habilitar Traefik
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
+      
+      # Router HTTP (redirect to HTTPS)
+      - "traefik.http.routers.grafana-http.rule=Host(`grafana.lucasvsj.com`)"
+      - "traefik.http.routers.grafana-http.entrypoints=web"
+      - "traefik.http.routers.grafana-http.middlewares=redirect-to-https"
+      
+      # Router HTTPS
+      - "traefik.http.routers.grafana-https.rule=Host(`grafana.lucasvsj.com`)"
+      - "traefik.http.routers.grafana-https.entrypoints=websecure"
+      - "traefik.http.routers.grafana-https.tls=true"
+      - "traefik.http.routers.grafana-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.grafana-https.middlewares=grafana-security"
+      
+      # Service
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+      
+      # Middleware: Redirect to HTTPS
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
+      
+      # Middleware: Security Headers
+      - "traefik.http.middlewares.grafana-security.headers.customFrameOptionsValue=SAMEORIGIN"
+      - "traefik.http.middlewares.grafana-security.headers.customResponseHeaders.X-Content-Type-Options=nosniff"
+      - "traefik.http.middlewares.grafana-security.headers.customResponseHeaders.X-XSS-Protection=1; mode=block"
+      - "traefik.http.middlewares.grafana-security.headers.stsSeconds=63072000"
+      - "traefik.http.middlewares.grafana-security.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.grafana-security.headers.stsPreload=true"
+      - "traefik.http.middlewares.grafana-security.headers.contentSecurityPolicy=default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:;"
+      
+      # Middleware: Rate Limiting (anti brute force)
+      - "traefik.http.middlewares.grafana-ratelimit.ratelimit.average=100"
+      - "traefik.http.middlewares.grafana-ratelimit.ratelimit.burst=50"
+      
+      # Middleware: Compression
+      - "traefik.http.middlewares.grafana-compress.compress=true"
+      
+      # Chain middlewares
+      - "traefik.http.routers.grafana-https.middlewares=grafana-security,grafana-ratelimit,grafana-compress"
+    
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ==============================================
+  # PROMETHEUS - PRODUCCIÓN
+  # ==============================================
+  prometheus-prod:
+    image: prom/prometheus:latest
+    container_name: prometheus-prod
+    restart: unless-stopped
+    
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--web.external-url=https://prometheus.lucasvsj.com'
+    
+    volumes:
+      - prometheus-prod-data:/prometheus
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/alerts:/etc/prometheus/alerts
+    
+    networks:
+      - traefik-public
+      - grafana-prod-network
+    
+    labels:
+      # Habilitar Traefik
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
+      
+      # Router HTTP (redirect to HTTPS)
+      - "traefik.http.routers.prometheus-http.rule=Host(`prometheus.lucasvsj.com`)"
+      - "traefik.http.routers.prometheus-http.entrypoints=web"
+      - "traefik.http.routers.prometheus-http.middlewares=redirect-to-https"
+      
+      # Router HTTPS
+      - "traefik.http.routers.prometheus-https.rule=Host(`prometheus.lucasvsj.com`)"
+      - "traefik.http.routers.prometheus-https.entrypoints=websecure"
+      - "traefik.http.routers.prometheus-https.tls=true"
+      - "traefik.http.routers.prometheus-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.prometheus-https.middlewares=prometheus-security"
+      
+      # Service
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+      
+      # Middleware: Security Headers
+      - "traefik.http.middlewares.prometheus-security.headers.customFrameOptionsValue=SAMEORIGIN"
+      - "traefik.http.middlewares.prometheus-security.headers.customResponseHeaders.X-Content-Type-Options=nosniff"
+      - "traefik.http.middlewares.prometheus-security.headers.stsSeconds=63072000"
+      - "traefik.http.middlewares.prometheus-security.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.prometheus-security.headers.stsPreload=true"
+      
+      # Middleware: Basic Auth (opcional - descomentar y configurar)
+      # - "traefik.http.middlewares.prometheus-auth.basicauth.users=admin:$$apr1$$..."
+      # - "traefik.http.routers.prometheus-https.middlewares=prometheus-security,prometheus-auth"
+    
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+# ==============================================
+# VOLUMES
+# ==============================================
+volumes:
+  grafana-dev-data:
+    driver: local
+  grafana-prod-data:
+    driver: local
+  prometheus-dev-data:
+    driver: local
+  prometheus-prod-data:
+    driver: local
+
+# ==============================================
+# NETWORKS
+# ==============================================
+networks:
+  grafana-dev-network:
+    driver: bridge
+  
+  grafana-prod-network:
+    driver: bridge
+  
+  traefik-public:
+    external: true
