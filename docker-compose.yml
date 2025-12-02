@@ -170,7 +170,7 @@ services:
     labels:
       # Habilitar Traefik
       - "traefik.enable=true"
-      - "traefik.docker.network=traefik-public"
+      - "traefik.docker.network=traefik_network"
       
       # Router HTTP (redirect to HTTPS)
       - "traefik.http.routers.grafana-http.rule=Host(`grafana.lucasvsj.com`)"
@@ -245,7 +245,7 @@ services:
     labels:
       # Habilitar Traefik
       - "traefik.enable=true"
-      - "traefik.docker.network=traefik-public"
+      - "traefik.docker.network=traefik_network"
       
       # Router HTTP (redirect to HTTPS)
       - "traefik.http.routers.prometheus-http.rule=Host(`prometheus.lucasvsj.com`)"
