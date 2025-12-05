@@ -8,28 +8,12 @@ datasources:
   - name: Prometheus
     type: prometheus
     access: proxy
-    url: ${PROMETHEUS_URL}
+    url: http://prometheus:9090
     isDefault: true
     editable: true
     jsonData:
-  #     timeInterval: 30s
-  
-  # Ejemplo: Loki para logs (descomentar y configurar si tienes Loki)
-  # - name: Loki
-  #   type: loki
-  #   access: proxy
-  #   url: http://loki:3100
-  #   editable: true
-  
-  # Ejemplo: MySQL/PostgreSQL (descomentar y configurar según necesites)
-  # - name: MySQL
-  #   type: mysql
-  #   url: mysql-server:3306
-  #   database: mydb
-  #   user: grafana
-  #   secureJsonData:
-  #     password: 'password'
-  
+      timeInterval: 15s
+
   # TestData (datasource de ejemplo para testing)
   - name: TestData
     type: testdata
