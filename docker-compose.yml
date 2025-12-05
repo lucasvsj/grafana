@@ -50,6 +50,9 @@ services:
       - GF_SMTP_USER=${SMTP_USER:-}
       - GF_SMTP_PASSWORD=${SMTP_PASSWORD:-}
       - GF_SMTP_FROM_ADDRESS=${SMTP_FROM_ADDRESS:-grafana@localhost}
+      
+      # Prometheus datasource URL
+      - PROMETHEUS_URL=http://prometheus-dev:9090
     
     volumes:
       - grafana-dev-data:/var/lib/grafana
@@ -157,6 +160,9 @@ services:
       - GF_SMTP_USER=${SMTP_USER:-}
       - GF_SMTP_PASSWORD=${SMTP_PASSWORD:-}
       - GF_SMTP_FROM_ADDRESS=${SMTP_FROM_ADDRESS:-grafana@lucasvsj.com}
+      
+      # Prometheus datasource URL
+      - PROMETHEUS_URL=http://prometheus-prod:9090
     
     volumes:
       - grafana-prod-data:/var/lib/grafana
