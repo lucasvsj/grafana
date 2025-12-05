@@ -47,11 +47,11 @@ scrape_configs:
           environment: 'development'
   
   # Ejemplo: Node Exporter (descomentar si lo instalas)
-  # - job_name: 'node-exporter'
-  #   static_configs:
-  #     - targets: ['node-exporter:9100']
-  #       labels:
-  #         service: 'node-exporter'
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          service: 'node-exporter'
   
   # Ejemplo: cAdvisor para métricas de contenedores Docker
   # - job_name: 'cadvisor'

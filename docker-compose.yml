@@ -280,6 +280,26 @@ services:
       retries: 3
       start_period: 40s
 
+
+  # ==============================================
+  # NODE EXPORTER - METRICAS DEL HOST
+  # ==============================================
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+    networks:
+      - grafana-dev-network
+      - grafana-prod-network
+
 # ==============================================
 # VOLUMES
 # ==============================================
