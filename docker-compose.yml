@@ -77,7 +77,7 @@ services:
       - "traefik.http.routers.grafana-https.rule=Host(`grafana.lucasvsj.com`)"
       - "traefik.http.routers.grafana-https.entrypoints=websecure"
       - "traefik.http.routers.grafana-https.tls=true"
-      - "traefik.http.routers.grafana-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.grafana-https.tls.certresolver=cloudflare"
       - "traefik.http.routers.grafana-https.middlewares=grafana-security"
       
       # Service
@@ -144,7 +144,7 @@ services:
       - "traefik.http.routers.prometheus-https.rule=Host(`prometheus.lucasvsj.com`)"
       - "traefik.http.routers.prometheus-https.entrypoints=websecure"
       - "traefik.http.routers.prometheus-https.tls=true"
-      - "traefik.http.routers.prometheus-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.prometheus-https.tls.certresolver=cloudflare"
       - "traefik.http.routers.prometheus-https.middlewares=prometheus-security"
       
       # Service
