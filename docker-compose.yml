@@ -36,9 +36,9 @@ services:
       - GF_USERS_DEFAULT_THEME=dark
       
       # Security
-      - GF_SECURITY_COOKIE_SECURE=${GRAFANA_COOKIE_SECURE:-false}
+      - GF_SECURITY_COOKIE_SECURE=${GRAFANA_COOKIE_SECURE:-true}
       - GF_SECURITY_COOKIE_SAMESITE=lax
-      - GF_SECURITY_STRICT_TRANSPORT_SECURITY=${GRAFANA_STRICT_TRANSPORT_SECURITY:-false}
+      - GF_SECURITY_STRICT_TRANSPORT_SECURITY=${GRAFANA_STRICT_TRANSPORT_SECURITY:-true}
       
       # Logs
       - GF_LOG_MODE=console
@@ -56,44 +56,28 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana/dashboards:/var/lib/grafana/dashboards
     
+    # Bind a 127.0.0.1 para que el acceso directo al puerto solo sea posible
+    # desde el host mismo — el acceso externo siempre pasa por Traefik.
     ports:
-      - "3948:3948"
-    
+      - "127.0.0.1:3948:3948"
+
     networks:
       - monitoring-network
       - traefik_network
-    
+
     labels:
-      # Habilitar Traefik
       - "traefik.enable=true"
       - "traefik.docker.network=traefik_network"
-      
-      # Router HTTP (redirect to HTTPS)
-      - "traefik.http.routers.grafana-http.rule=Host(`grafana.lucasvsj.com`)"
-      - "traefik.http.routers.grafana-http.entrypoints=web"
-      - "traefik.http.routers.grafana-http.middlewares=redirect-to-https"
-      
-      # Router HTTPS
+
+      # Router HTTPS — admin-chain@file añade rate-limit estricto + headers
       - "traefik.http.routers.grafana-https.rule=Host(`grafana.lucasvsj.com`)"
       - "traefik.http.routers.grafana-https.entrypoints=websecure"
       - "traefik.http.routers.grafana-https.tls=true"
       - "traefik.http.routers.grafana-https.tls.certresolver=cloudflare"
-      - "traefik.http.routers.grafana-https.middlewares=grafana-security"
-      
+      - "traefik.http.routers.grafana-https.middlewares=admin-chain@file"
+
       # Service
       - "traefik.http.services.grafana.loadbalancer.server.port=3948"
-      
-      # Middleware: Redirect to HTTPS
-      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
-      - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
-      
-      # Middleware: Security Headers
-      - "traefik.http.middlewares.grafana-security.headers.customFrameOptionsValue=SAMEORIGIN"
-      - "traefik.http.middlewares.grafana-security.headers.customResponseHeaders.X-Content-Type-Options=nosniff"
-      - "traefik.http.middlewares.grafana-security.headers.customResponseHeaders.X-XSS-Protection=1; mode=block"
-      - "traefik.http.middlewares.grafana-security.headers.stsSeconds=63072000"
-      - "traefik.http.middlewares.grafana-security.headers.stsIncludeSubdomains=true"
-      - "traefik.http.middlewares.grafana-security.headers.stsPreload=true"
     
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3948/api/health"]
@@ -116,46 +100,37 @@ services:
       - '--web.console.libraries=/etc/prometheus/console_libraries'
       - '--web.console.templates=/etc/prometheus/consoles'
       - '--web.enable-lifecycle'
-      - '--web.enable-admin-api'
+      # --web.enable-admin-api removido: permitía DELETE /api/v1/admin/tsdb/* sin auth,
+      # lo que posibilitaba borrar toda la data de métricas desde internet.
     
     volumes:
       - prometheus-data:/prometheus
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - ./prometheus/alerts:/etc/prometheus/alerts
     
+    # Bind a 127.0.0.1 — Prometheus no tiene auth propia, acceso solo vía Traefik.
     ports:
-      - "9090:9090"
-    
+      - "127.0.0.1:9090:9090"
+
     networks:
       - monitoring-network
       - traefik_network
-    
+
     labels:
-      # Habilitar Traefik
       - "traefik.enable=true"
       - "traefik.docker.network=traefik_network"
-      
-      # Router HTTP (redirect to HTTPS)
-      - "traefik.http.routers.prometheus-http.rule=Host(`prometheus.lucasvsj.com`)"
-      - "traefik.http.routers.prometheus-http.entrypoints=web"
-      - "traefik.http.routers.prometheus-http.middlewares=redirect-to-https"
-      
-      # Router HTTPS
+
+      # Router HTTPS con basicauth + admin-chain (rate-limit estricto + headers).
+      # PROMETHEUS_PASSWORD_HASH: generar con `htpasswd -nB usuario` y poner en .env.
       - "traefik.http.routers.prometheus-https.rule=Host(`prometheus.lucasvsj.com`)"
       - "traefik.http.routers.prometheus-https.entrypoints=websecure"
       - "traefik.http.routers.prometheus-https.tls=true"
       - "traefik.http.routers.prometheus-https.tls.certresolver=cloudflare"
-      - "traefik.http.routers.prometheus-https.middlewares=prometheus-security"
-      
+      - "traefik.http.routers.prometheus-https.middlewares=prometheus-auth,admin-chain@file"
+      - "traefik.http.middlewares.prometheus-auth.basicauth.users=${PROMETHEUS_PASSWORD_HASH}"
+
       # Service
       - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
-      
-      # Middleware: Security Headers
-      - "traefik.http.middlewares.prometheus-security.headers.customFrameOptionsValue=SAMEORIGIN"
-      - "traefik.http.middlewares.prometheus-security.headers.customResponseHeaders.X-Content-Type-Options=nosniff"
-      - "traefik.http.middlewares.prometheus-security.headers.stsSeconds=63072000"
-      - "traefik.http.middlewares.prometheus-security.headers.stsIncludeSubdomains=true"
-      - "traefik.http.middlewares.prometheus-security.headers.stsPreload=true"
     
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
