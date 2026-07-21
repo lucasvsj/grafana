@@ -5,7 +5,11 @@ services:
   # GRAFANA
   # ==============================================
   grafana:
-    image: grafana/grafana:latest
+    security_opt:
+      - no-new-privileges:true
+    # Pin de versión: actualizar es una decisión deliberada, no un efecto
+    # colateral de `docker compose pull`. Grafana NO soporta downgrade.
+    image: grafana/grafana:${GRAFANA_VERSION:-12.2.0}
     container_name: grafana
     restart: unless-stopped
     
@@ -90,7 +94,9 @@ services:
   # PROMETHEUS
   # ==============================================
   prometheus:
-    image: prom/prometheus:latest
+    security_opt:
+      - no-new-privileges:true
+    image: prom/prometheus:${PROMETHEUS_VERSION:-v3.5.0}
     container_name: prometheus
     restart: unless-stopped
     
@@ -143,7 +149,9 @@ services:
   # NODE EXPORTER - METRICAS DEL HOST
   # ==============================================
   node-exporter:
-    image: prom/node-exporter:latest
+    security_opt:
+      - no-new-privileges:true
+    image: prom/node-exporter:${NODE_EXPORTER_VERSION:-v1.9.1}
     container_name: node-exporter
     restart: unless-stopped
     volumes:
