@@ -73,12 +73,15 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik_network"
 
-      # Router HTTPS — admin-chain@file añade rate-limit estricto + headers
+      # Router HTTPS — security-chain (100 req/s, burst 50) y NO admin-chain:
+      # un dashboard dispara una query por panel en paralelo y el burst de 5
+      # del rate-limit-strict devolvía 429 al cargar. El brute-force de login
+      # ya lo mitiga Grafana (bloqueo de cuenta por intentos fallidos).
       - "traefik.http.routers.grafana-https.rule=Host(`grafana.lucasvsj.com`)"
       - "traefik.http.routers.grafana-https.entrypoints=websecure"
       - "traefik.http.routers.grafana-https.tls=true"
       - "traefik.http.routers.grafana-https.tls.certresolver=cloudflare"
-      - "traefik.http.routers.grafana-https.middlewares=admin-chain@file"
+      - "traefik.http.routers.grafana-https.middlewares=security-chain@file"
 
       # Service
       - "traefik.http.services.grafana.loadbalancer.server.port=3948"
