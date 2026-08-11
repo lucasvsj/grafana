@@ -8,6 +8,19 @@ global:
   external_labels:
     monitor: 'grafana-project'
 
+# Reglas de alerta. Sin este bloque el directorio alerts/ se ignora por
+# completo y /api/v1/rules devuelve {"groups":[]} — que es exactamente como
+# estuvo desde diciembre de 2025: métricas y paneles, pero nada que avisara.
+rule_files:
+  - '/etc/prometheus/alerts/*.yml'
+
+# A dónde van las alertas que disparan. Sin esto las reglas se evalúan y se ven
+# en la interfaz de Prometheus, pero no salen a ninguna parte.
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
 # Configuración de scrape
 scrape_configs:
   # Monitoreo de Prometheus mismo
@@ -18,9 +31,14 @@ scrape_configs:
           service: 'prometheus'
   
   # Monitoreo de Grafana
+  # Puerto 3948 y NO 3000. Grafana arranca con GF_SERVER_HTTP_PORT=3948
+  # (ver docker-compose.yml), así que el objetivo apuntaba a un puerto donde no
+  # había nada y este scrape llevaba fallando desde siempre — en silencio,
+  # porque no existía ninguna alerta que lo dijera. La regla ObjetivoCaido lo
+  # sacó a la luz en su primera hora de vida.
   - job_name: 'grafana'
     static_configs:
-      - targets: ['grafana:3000']
+      - targets: ['grafana:3948']
         labels:
           service: 'grafana'
   

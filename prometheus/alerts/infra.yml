@@ -1,0 +1,158 @@
+# =============================================================================
+# Reglas de alerta.
+# =============================================================================
+# Este directorio existía desde diciembre de 2025 con un .gitkeep dentro, y
+# prometheus.yml no tenía `rule_files`, así que /api/v1/rules devolvía
+# {"groups":[]}. Había métricas y paneles, pero nada que avisara: todo lo que se
+# ha arreglado estos días —el swap al 68%, los 167 procesos zombie, el disco
+# creciendo hasta 131 GB de caché— se descubrió mirando, no porque algo avisara.
+#
+# Las reglas de aquí abajo son deliberadamente pocas y sobre problemas que YA
+# ocurrieron en este servidor. Una alerta que salta y no exige actuar enseña a
+# ignorar las alertas, y eso es peor que no tenerlas.
+#
+# `for:` es lo que separa un pico de un problema. Sin él, cualquier compilación
+# que llene la memoria un minuto mandaría un mensaje al teléfono.
+# =============================================================================
+groups:
+
+  - name: disco
+    rules:
+      - alert: DiscoLlenandose
+        # Umbral al 80%: con 468 GB, deja ~90 GB de margen, tiempo de sobra
+        # para reaccionar sin prisa.
+        expr: |
+          (1 - node_filesystem_avail_bytes{mountpoint="/",fstype!="tmpfs"}
+             / node_filesystem_size_bytes{mountpoint="/",fstype!="tmpfs"}) * 100 > 80
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disco al {{ $value | printf \"%.0f\" }}%"
+          description: >-
+            La raíz supera el 80%. El sospechoso habitual es la caché de build de
+            Docker: llegó a 131 GB con cero entradas activas. Comprobar con
+            `docker system df` antes de buscar en otro sitio.
+
+      - alert: DiscoCritico
+        expr: |
+          (1 - node_filesystem_avail_bytes{mountpoint="/",fstype!="tmpfs"}
+             / node_filesystem_size_bytes{mountpoint="/",fstype!="tmpfs"}) * 100 > 92
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Disco al {{ $value | printf \"%.0f\" }}% — crítico"
+          description: >-
+            Con el disco lleno, Postgres deja de aceptar escrituras y Docker no
+            puede ni arrancar contenedores. Liberar espacio ahora.
+
+  - name: memoria
+    rules:
+      - alert: MemoriaDisponibleBaja
+        expr: |
+          node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100 < 10
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Solo {{ $value | printf \"%.0f\" }}% de memoria disponible"
+          description: >-
+            Antes de que el OOM killer elija por ti. El mayor consumidor conocido
+            es Ollama (~4 GB haciendo inferencia en CPU).
+
+      - alert: SwapAlto
+        # El swap alto por sí solo NO es un problema: son páginas frías y Linux
+        # nunca las devuelve por su cuenta. Lo que importa es que el swap esté
+        # alto Y quede poca memoria — ahí sí hay presión real.
+        expr: |
+          (1 - node_memory_SwapFree_bytes / node_memory_SwapTotal_bytes) * 100 > 75
+          and
+          node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100 < 20
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Swap al {{ $value | printf \"%.0f\" }}% con poca RAM libre"
+          description: >-
+            Esta combinación sí indica presión de memoria. El swap alto a secas,
+            con RAM disponible, es basura fría y no requiere acción.
+
+  - name: disponibilidad
+    rules:
+      - alert: ObjetivoCaido
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prometheus no alcanza a {{ $labels.job }}"
+          description: >-
+            El objetivo {{ $labels.instance }} lleva 5 minutos sin responder al
+            scrape.
+
+      - alert: CargaSostenida
+        # Normalizada por número de CPU: 16 núcleos aquí.
+        expr: |
+          node_load15 / count(count(node_cpu_seconds_total) by (cpu)) > 2
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Carga sostenida de {{ $value | printf \"%.1f\" }}x los núcleos"
+          description: >-
+            Media de 15 minutos por encima del doble de los núcleos. Ollama
+            haciendo inferencia en CPU es la causa más probable.
+
+  - name: traefik
+    rules:
+      # Esta regla saltó como falso positivo en su primera hora, y el arreglo
+      # está en las dos condiciones que ahora lleva.
+      #
+      # Lo que pasó: el servidor recibe ~0,12 req/s, y los sondeos de bots a
+      # /.env devuelven 502 por diseño (dynamic/block.yml los manda a un puerto
+      # muerto). Ocho probes en diez minutos bastaban para poner el ratio en
+      # 11% y disparar la alerta sin que nada estuviera roto.
+      #
+      #   1. Se excluye `block-svc@file`, que es el bloqueador. Sus 502 son el
+      #      comportamiento correcto, no un fallo. Ojo con el nombre de la
+      #      etiqueta: Traefik la llama `service`, pero el scrape_config ya
+      #      define una etiqueta `service`, así que Prometheus renombra la del
+      #      target a `exported_service`.
+      #   2. Se exige un mínimo ABSOLUTO de errores. Un porcentaje sobre tráfico
+      #      casi nulo mide ruido: con 7 peticiones por minuto, una sola que
+      #      falle ya son 14%.
+      #
+      # Una caída total no se detecta aquí sino con ObjetivoCaido y con la
+      # vigilancia externa de GitHub Actions, que es donde corresponde.
+      - alert: TasaDeErrores5xx
+        expr: |
+          sum(rate(traefik_service_requests_total{code=~"5..",exported_service!="block-svc@file"}[10m])) > 0.05
+          and
+          (
+            sum(rate(traefik_service_requests_total{code=~"5..",exported_service!="block-svc@file"}[10m]))
+            /
+            sum(rate(traefik_service_requests_total{exported_service!="block-svc@file"}[10m]))
+          ) * 100 > 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $value | printf \"%.3f\" }} errores 5xx por segundo"
+          description: >-
+            Más del 5% de las peticiones fallan con error de servidor, y son
+            suficientes en términos absolutos como para no ser ruido. Excluye
+            los 502 intencionados del bloqueador de escáneres.
+
+      - alert: CertificadoPorVencer
+        expr: |
+          traefik_tls_certs_not_after - time() < 14 * 24 * 3600
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Certificado TLS vence en menos de 14 días"
+          description: >-
+            La renovación es automática por DNS-01 contra Cloudflare. Si esta
+            alerta salta, la renovación está fallando: revisar CF_DNS_API_TOKEN
+            y los logs de Traefik.

@@ -1,0 +1,56 @@
+# =============================================================================
+# Alertmanager — enruta las alertas de Prometheus a Telegram.
+# =============================================================================
+# El bot es el mismo que ya usan SecureApp y los backups. El token NO se escribe
+# aquí: llega por `bot_token_file`, montado desde un secreto. Este archivo está
+# versionado en git.
+# =============================================================================
+
+route:
+  receiver: telegram
+
+  # Agrupa por alerta y severidad. Sin agrupar, un incidente que dispara cuatro
+  # reglas a la vez son cuatro mensajes seguidos al teléfono.
+  group_by: ['alertname', 'severity']
+
+  # Espera 30s antes del primer envío por si el mismo problema dispara más
+  # reglas y pueden ir juntas.
+  group_wait: 30s
+  # Si al grupo se suman alertas nuevas, espera 5 min antes de volver a avisar.
+  group_interval: 5m
+  # Y repite el aviso de algo que sigue activo cada 6 horas — no cada 5 minutos.
+  # Repetir demasiado enseña a silenciar el chat, que es la peor consecuencia
+  # posible de un sistema de alertas.
+  repeat_interval: 6h
+
+  routes:
+    # Lo crítico no espera al agrupado ni tarda 6h en repetirse.
+    - matchers:
+        - severity = "critical"
+      receiver: telegram
+      group_wait: 10s
+      repeat_interval: 1h
+
+receivers:
+  - name: telegram
+    telegram_configs:
+      - bot_token_file: /etc/alertmanager/secrets/bot_token
+        chat_id: 000000000   # <-- el tuyo: ./scripts/get-telegram-chat-id.sh
+        api_url: https://api.telegram.org
+        parse_mode: HTML
+        send_resolved: true
+        message: |
+          {{ if eq .Status "firing" }}{{ if eq (index .Alerts 0).Labels.severity "critical" }}🔴{{ else }}🟡{{ end }} <b>{{ .CommonLabels.alertname }}</b>{{ else }}🟢 <b>Resuelto: {{ .CommonLabels.alertname }}</b>{{ end }}
+          {{ range .Alerts }}
+          {{ .Annotations.summary }}
+          {{ if .Annotations.description }}<i>{{ .Annotations.description }}</i>{{ end }}
+          {{ end }}
+
+inhibit_rules:
+  # Si el disco ya está en crítico, no hace falta el aviso de warning del mismo
+  # problema.
+  - source_matchers:
+      - severity = "critical"
+    target_matchers:
+      - severity = "warning"
+    equal: ['alertname']

@@ -24,3 +24,7 @@ Thumbs.db
 *~
 
 All Data-1764817289571.json
+
+# Credenciales de Alertmanager
+alertmanager/secrets/
+alertmanager/alertmanager.yml

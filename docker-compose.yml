@@ -149,6 +149,42 @@ services:
       start_period: 40s
 
   # ==============================================
+  # ALERTMANAGER - ENRUTA LAS ALERTAS A TELEGRAM
+  # ==============================================
+  # Sin esto, las reglas de prometheus/alerts/ se evalúan y se ven en la
+  # interfaz de Prometheus, pero no salen a ninguna parte.
+  #
+  # No se publica por Traefik a propósito: no tiene autenticación propia y su
+  # interfaz permite silenciar alertas, que es justo lo que no debe poder hacer
+  # nadie desde internet. Se consulta con un túnel SSH si hace falta:
+  #   ssh -L 9093:127.0.0.1:9093 servidor
+  alertmanager:
+    security_opt:
+      - no-new-privileges:true
+    image: prom/alertmanager:v0.28.1
+    container_name: alertmanager
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      # El token del bot va en su propio archivo (bot_token_file) y no en el
+      # YAML, que sí se versiona.
+      - ./alertmanager/secrets:/etc/alertmanager/secrets:ro
+      - alertmanager-data:/alertmanager
+    ports:
+      - "127.0.0.1:9093:9093"
+    networks:
+      - monitoring-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ==============================================
   # NODE EXPORTER - METRICAS DEL HOST
   # ==============================================
   node-exporter:
@@ -175,6 +211,7 @@ volumes:
   grafana-data:
     driver: local
   prometheus-data:
+  alertmanager-data:
     driver: local
 
 # ==============================================
